@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalender Absensi Checklist</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        padding: 20px;
+        text-align: center;
+      }
+      h1 {
+        margin-bottom: 10px;
+      }
+      .controls {
+        margin-bottom: 20px;
+      }
+      .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+        max-width: 800px;
+        margin: auto;
+      }
+      .day,
+      .header {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+      }
+      .header {
+        font-weight: bold;
+        background: #007bff;
+        color: white;
+      }
+      .day label {
+        display: block;
+        margin-top: 5px;
+      }
+      button,
+      select {
+        padding: 8px 12px;
+        margin: 4px;
+        border-radius: 5px;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+      .btn-primary:hover {
+        background-color: #0056b3;
+      }
+      .btn-danger {
+        background-color: #dc3545;
+        color: white;
+      }
+      .btn-danger:hover {
+        background-color: #a71d2a;
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+      }
+      .btn-secondary:hover {
+        background-color: #545b62;
+      }
+      select {
+        background: #ffffff;
+        border: 1px solid #ccc;
+      }
+      #confirmBox {
+        margin-top: 20px;
+        display: none;
+        background: #fff0f0;
+        padding: 10px;
+        border: 1px solid #ff4d4d;
+        border-radius: 5px;
+      }
+      .summary {
+        margin-top: 20px;
+        font-size: 16px;
+      }
+      .summary span {
+        font-weight: bold;
+        color: #007bff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Kalender Absensi</h1>
+
+    <div class="controls">
+      <button class="btn-primary" onclick="prevMonth()">← Sebelumnya</button>
+      <span id="monthYear"></span>
+      <button class="btn-primary" onclick="nextMonth()">Berikutnya →</button>
+      <br />
+      <select id="monthSelect"></select>
+      <select id="yearSelect"></select>
+      <button class="btn-secondary" onclick="goToSelectedMonth()">Cari</button>
+      <button class="btn-primary" onclick="goToToday()">
+        Kembali ke Bulan Ini
+      </button>
+      <button class="btn-danger" onclick="showConfirmBox()">
+        Hapus Semua Checklist
+      </button>
+    </div>
+
+    <div id="calendar" class="calendar"></div>
+
+    <div id="confirmBox">
+      <p>Yakin ingin menghapus semua checklist bulan ini?</p>
+      <button class="btn-danger" onclick="clearAll()">Ya, Hapus</button>
+      <button class="btn-secondary" onclick="hideConfirmBox()">Batal</button>
+    </div>
+
+    <div class="summary">
+      Total hadir bulan ini: <span id="countMonth">0</span><br />
+      Total hadir tahun ini: <span id="countYear">0</span>
+    </div>
+
+    <script>
+      const calendarEl = document.getElementById("calendar");
+      const monthYearEl = document.getElementById("monthYear");
+      const confirmBox = document.getElementById("confirmBox");
+      const monthSelect = document.getElementById("monthSelect");
+      const yearSelect = document.getElementById("yearSelect");
+      const countMonthEl = document.getElementById("countMonth");
+      const countYearEl = document.getElementById("countYear");
+
+      let currentDate = new Date();
+
+      const dayNames = [
+        "Minggu",
+        "Senin",
+        "Selasa",
+        "Rabu",
+        "Kamis",
+        "Jumat",
+        "Sabtu",
+      ];
+      const monthNames = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+
+      function renderCalendar() {
+        calendarEl.innerHTML = "";
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startDay = new Date(year, month, 1).getDay();
+
+        monthYearEl.textContent = `${monthNames[month]} ${year}`;
+
+        dayNames.forEach((day) => {
+          const header = document.createElement("div");
+          header.className = "header";
+          header.textContent = day;
+          calendarEl.appendChild(header);
+        });
+
+        for (let i = 0; i < startDay; i++) {
+          calendarEl.appendChild(document.createElement("div"));
+        }
+
+        let monthlyCount = 0;
+
+        for (let i = 1; i <= daysInMonth; i++) {
+          const dateKey = `${year}-${month + 1}-${i}`;
+          const saved = localStorage.getItem(dateKey) === "true";
+          if (saved) monthlyCount++;
+
+          const dayBox = document.createElement("div");
+          dayBox.className = "day";
+          dayBox.innerHTML = `
+        <strong>${i}</strong>
+        <label>
+          <input type="checkbox" ${
+            saved ? "checked" : ""
+          } onchange="saveAttendance('${dateKey}', this.checked)">
+          Hadir
+        </label>
+      `;
+          calendarEl.appendChild(dayBox);
+        }
+
+        countMonthEl.textContent = monthlyCount;
+        countYearAttendance(year);
+      }
+
+      function countYearAttendance(year) {
+        let count = 0;
+        for (let m = 0; m < 12; m++) {
+          const days = new Date(year, m + 1, 0).getDate();
+          for (let d = 1; d <= days; d++) {
+            const key = `${year}-${m + 1}-${d}`;
+            if (localStorage.getItem(key) === "true") {
+              count++;
+            }
+          }
+        }
+        countYearEl.textContent = count;
+      }
+
+      function saveAttendance(date, value) {
+        localStorage.setItem(date, value);
+        renderCalendar(); // agar total checklist diperbarui otomatis
+      }
+
+      function prevMonth() {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        hideConfirmBox();
+        renderCalendar();
+      }
+
+      function nextMonth() {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        hideConfirmBox();
+        renderCalendar();
+      }
+
+      function goToToday() {
+        currentDate = new Date();
+        hideConfirmBox();
+        renderCalendar();
+      }
+
+      function showConfirmBox() {
+        confirmBox.style.display = "block";
+      }
+
+      function hideConfirmBox() {
+        confirmBox.style.display = "none";
+      }
+
+      function clearAll() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for (let i = 1; i <= daysInMonth; i++) {
+          const dateKey = `${year}-${month + 1}-${i}`;
+          localStorage.removeItem(dateKey);
+        }
+        hideConfirmBox();
+        renderCalendar();
+      }
+
+      function populateMonthYearSelectors() {
+        monthNames.forEach((m, index) => {
+          const option = document.createElement("option");
+          option.value = index;
+          option.textContent = m;
+          monthSelect.appendChild(option);
+        });
+
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+          const option = document.createElement("option");
+          option.value = y;
+          option.textContent = y;
+          yearSelect.appendChild(option);
+        }
+
+        monthSelect.value = currentDate.getMonth();
+        yearSelect.value = currentDate.getFullYear();
+      }
+
+      function goToSelectedMonth() {
+        const selectedMonth = parseInt(monthSelect.value);
+        const selectedYear = parseInt(yearSelect.value);
+        currentDate.setFullYear(selectedYear, selectedMonth, 1);
+        renderCalendar();
+      }
+
+      populateMonthYearSelectors();
+      renderCalendar();
+    </script>
+  </body>
+</html>
